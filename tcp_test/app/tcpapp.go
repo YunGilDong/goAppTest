@@ -44,35 +44,51 @@ func (a *AppTcpHandler) ManageComm() {
 		a.Close()
 		a.tcp.Connect()
 	}
-
-	a.ManageRx()
-	a.ManageTx()
 }
 
-func (a *AppTcpHandler) ManageRx() bool {
-	var data []byte = []byte{}
+func (a *AppTcpHandler) Manage(ch_connected chan bool) {
+
+	select {
+	case connected := <-ch_connected:
+		if !connected {
+			a.tcp.Close()
+			a.tcp.Connect()
+		}
+
+	default:
+		if !a.tcp.IsConnected() {
+			fmt.Println("isConnect..", a.tcp.IsConnected())
+			a.tcp.Connect()
+		}
+	}
+}
+
+func (a *AppTcpHandler) ManageRx(ch_connected chan bool) bool {
+	data := make([]byte, 10240, 10240)
 	fmt.Println("manageRX")
 	len, err := a.tcp.Read(data)
 	fmt.Println("manageRX", len)
 	if err != nil {
 		fmt.Println("read err: ", err)
 		a.Close()
+		ch_connected <- false
 		return false
 	}
-	fmt.Println("read len", len, data)
+	fmt.Println("read len", len, data[0:len])
 	return true
 }
 
-func (a *AppTcpHandler) ManageTx() bool {
+func (a *AppTcpHandler) ManageTx(ch_connected chan bool) bool {
 	var data []byte = []byte("hello world tcp app")
 	len, err := a.tcp.Send(data)
 	fmt.Println("manageTX", len)
 	if err != nil {
 		fmt.Println("send err:", err)
 		a.Close()
+		ch_connected <- false
 		return false
 	}
-	fmt.Println("send len:", len, data)
+	fmt.Println("send len:", len, string(data))
 	return true
 }
 
@@ -80,14 +96,60 @@ func (a *AppTcpHandler) Close() {
 	a.tcp.Close()
 }
 
-func RunTcp(a *AppTcpHandler) {
+func RunTcp(a *AppTcpHandler, chTcpMng TcpMngChannel) {
+	ch_connected := make(chan bool)
 
 	// ManageComm
+	a.tcp.Connect()
 
-	for {
-		a.ManageComm()
+	go a.Manage(ch_connected)
 
-		time.Sleep(time.Millisecond * 2000)
-	}
+	go func() {
+		for {
+			select {
+			case terminate := <-chTcpMng.Terminate_manage:
+				if terminate {
+					break
+				}
 
+			default:
+				a.Manage(ch_connected)
+				time.Sleep(time.Millisecond * 1000)
+			}
+		}
+
+	}()
+
+	go func() {
+		for {
+			select {
+			case terminate := <-chTcpMng.Terminate_manageRx:
+				if terminate {
+					break
+				}
+			default:
+				if a.tcp.IsConnected() {
+					a.ManageRx(ch_connected)
+				}
+				time.Sleep(time.Millisecond * 1000)
+			}
+		}
+	}()
+
+	go func() {
+		for {
+			select {
+			case terminate := <-chTcpMng.Terminate_manageTx:
+				if terminate {
+					break
+				}
+			default:
+				if a.tcp.IsConnected() {
+					a.ManageTx(ch_connected)
+				}
+				time.Sleep(time.Millisecond * 1000)
+			}
+
+		}
+	}()
 }

@@ -40,7 +40,7 @@ func (t *TcpHandler) InitComm(name string, port int, addr string) {
 // Connect
 //---------------------------------------------------------------------------
 func (t *TcpHandler) Connect() (bool, error) {
-	fmt.Println("connete to server ...")
+	fmt.Println("connect to server ...")
 	target := fmt.Sprintf("%s:%d", t.addr, t.port)
 	raddr, err := net.ResolveTCPAddr("tcp", target)
 	if err != nil {
@@ -51,13 +51,14 @@ func (t *TcpHandler) Connect() (bool, error) {
 	// connect to server
 	conn, err := net.DialTCP("tcp", nil, raddr)
 	if err != nil {
-		log.Fatal(err)
+		//log.Fatal(err)
 		return false, err
 	}
+	t.Connected = true
 	t.tcp = conn
 	t.tcp.SetNoDelay(false)
 
-	fmt.Println("conneted server ok")
+	fmt.Println("connected server ok")
 	return true, nil
 }
 
@@ -79,9 +80,7 @@ func (t *TcpHandler) Send(b []byte) (int, error) {
 //---------------------------------------------------------------------------
 func (t *TcpHandler) Read(data []byte) (int, error) {
 	var cnt int = 0
-	fmt.Println("Read(1)")
 	cnt, err := t.tcp.Read(data)
-	fmt.Println("Read(2)", cnt)
 
 	if err != nil {
 		return cnt, err

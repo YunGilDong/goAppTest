@@ -2,11 +2,27 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 	"tcp_test/app"
+	"tcp_test/model"
 	"time"
+
+	"github.com/gorilla/handlers"
 )
 
 func main() {
+	m := app.MakeHandler()
+	app.InitObjectDB()
+
+	app.ObjDB.LocDB[1] = &model.Local{LOC_ID: 1}
+
+	go func() {
+		err := http.ListenAndServe(":5000", handlers.CORS()(m))
+		if err != nil {
+			panic(err)
+		}
+	}()
+
 	fmt.Println("tcp-test start1")
 
 	tcpInst := app.MakeTcpHandler("tcptest", 6000, "127.0.0.1")
